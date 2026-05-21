@@ -399,3 +399,31 @@ FodyWeavers.xsd
 
 # Virtual environment
 .venv/
+
+# Python / Mattergen generated files
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Outputs and results
+outputs/
+results/
+datasets/cache/
+
+# Checkpoints and large model files
+*.ckpt
+*.pth
+*.h5
+*.joblib
+
+# Temporary files
+q
+*.log
+
+# IDE (if using VSCode/PyCharm)
+.vscode/
+.idea/
+*.swp

@@ -44,7 +44,7 @@ class LmdbNotFoundError(Exception):
     pass
 
 
-class LMDBGZSerializer():
+class LMDBGZSerializer:
     def __init__(
         self,
     ):
@@ -136,7 +136,7 @@ class LMDBBackedReferenceDatasetImpl(ReferenceDatasetImpl):
         """
         self.env = lmdb_open(lmdb_path, readonly=True)
         self.num_entries_by_chemsys_reduced_formulas = (
-            self._build_num_entries_by_chemsys_reduced_formulas(lmdb_path)
+            self._build_num_entries_by_chemsys_reduced_formulas()
         )
         self.total_num_entries = sum(
             sum(d.values()) for d in self.num_entries_by_chemsys_reduced_formulas.values()
@@ -144,20 +144,21 @@ class LMDBBackedReferenceDatasetImpl(ReferenceDatasetImpl):
         # close the LMDB environment when this object is garbage collected
         weakref.finalize(self, self._cleanup, self.env, cleanup_dir)
 
-    def _build_num_entries_by_chemsys_reduced_formulas(
-        self, lmdb_path: Path
-    ) -> dict[str, dict[str, int]]:
-        chemical_systems = lmdb_read_metadata(lmdb_path, "chemical_systems")
+    def _build_num_entries_by_chemsys_reduced_formulas(self) -> dict[str, dict[str, int]]:
+        """Build a mapping from chemical system to reduced formula to number of entries."""
         result: defaultdict[str, dict[str, int]] = defaultdict(dict)
         with self.env.begin() as txn:
+            # 读取所有化学系统列表
+            chemical_systems = lmdb_get(txn, "chemical_systems")
             for chemsys in chemical_systems:
-                reduced_formulas = lmdb_read_metadata(lmdb_path, f"{chemsys}.reduced_formulas")
+                # 读取该化学系统下的所有简化分子式
+                reduced_formulas = lmdb_get(txn, f"{chemsys}.reduced_formulas")
                 for reduced_formula in reduced_formulas:
-                    result[chemsys][reduced_formula] = lmdb_get(
-                        txn, f"{chemsys}.{reduced_formula}.length"
-                    )
-        # convert to an ordinary dictionary
-        return {key: val for key, val in result.items()}
+                    # 读取该简化分子式对应的条目数量
+                    length = lmdb_get(txn, f"{chemsys}.{reduced_formula}.length")
+                    result[chemsys][reduced_formula] = length
+        # 转换为普通字典（非必须，但保持原来返回类型）
+        return dict(result)
 
     def __iter__(self) -> Iterator[ComputedStructureEntry]:
         """Iterates over the entries in the dataset."""
@@ -251,7 +252,7 @@ class WeakRefImplMixin:
         impl = self._impl()
         assert impl is not None
         return impl
-    
+
 
 class LMDBBackedChemicalSystemLookup(WeakRefImplMixin, Mapping[str, list[ComputedStructureEntry]]):
     """A lazy immutable mapping from chemical system to entries. It is
